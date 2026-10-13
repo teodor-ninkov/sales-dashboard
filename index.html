@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auto Transport Sales Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #EDF0F2;
+  --surface: #FFFFFF;
+  --ink: #16202A;
+  --muted: #5C6B73;
+  --line: #D5DBDF;
+  --navy: #1E3A5F;
+  --amber: #D98E04;
+  --green: #1F7A5A;
+  --red: #B3362E;
+  --slate: #8A9BA8;
+  --code-bg: #16202A;
+  --code-ink: #E6EBEF;
+  --radius: 6px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.45;
+  font-size: 15px;
+}
+a { color: var(--navy); }
+button, select { font: inherit; color: inherit; }
+button:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+.page { max-width: 1240px; margin: 0 auto; padding: 32px 24px 64px; }
+
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+header.top h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; line-height: 1.1; }
+header.top p { margin: 0; color: var(--muted); max-width: 62ch; }
+.repo { white-space: nowrap; font-weight: 500; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 20px 32px; padding: 16px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-bottom: 28px; }
+.filter { display: flex; align-items: center; gap: 10px; }
+.filter > span { color: var(--muted); font-size: 14px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 7px 12px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--navy); color: #fff; }
+select { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 7px 10px; font-size: 14px; }
+
+.kpis { display: grid; grid-template-columns: repeat(6, 1fr); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 24px; }
+.kpi { padding: 18px 20px; border-left: 1px solid var(--line); }
+.kpi:first-child { border-left: 0; }
+.kpi .label { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+.kpi .value { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1; }
+.kpi .sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+.grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 20px; }
+.grid.even { grid-template-columns: 1fr 1fr; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; min-width: 0; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.panel-head h2 { font-size: 16px; font-weight: 600; margin: 0; }
+.panel-head p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+.sql-toggle { border: 1px solid var(--line); background: transparent; border-radius: var(--radius); padding: 5px 10px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--navy); }
+.sql-toggle[aria-expanded="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.panel-body { padding: 16px 18px; flex: 1; }
+.chart-wrap { position: relative; height: 280px; }
+.chart-wrap.tall { height: 320px; }
+pre.sql { display: none; margin: 0; padding: 14px 18px; background: var(--code-bg); color: var(--code-ink); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.5; overflow-x: auto; white-space: pre; border-radius: 0 0 var(--radius) var(--radius); }
+pre.sql.open { display: block; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; font-size: 13px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:last-child td { border-bottom: 0; }
+.bar { display: inline-block; height: 8px; background: var(--navy); border-radius: 2px; vertical-align: middle; margin-right: 8px; }
+.table-wrap { overflow-x: auto; }
+
+.explorer textarea { width: 100%; min-height: 150px; resize: vertical; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; line-height: 1.5; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #FAFBFB; color: var(--ink); }
+.explorer .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.run { background: var(--amber); color: var(--ink); border: 0; border-radius: var(--radius); padding: 9px 16px; font-weight: 600; cursor: pointer; }
+.run:hover { background: #C27F03; }
+.hint { color: var(--muted); font-size: 13px; }
+.error { color: var(--red); font-size: 14px; margin-top: 10px; }
+.result { margin-top: 16px; }
+.examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.examples button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 11px; font-size: 13px; cursor: pointer; color: var(--muted); }
+.examples button:hover { color: var(--ink); border-color: var(--slate); }
+
+.schema { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.schema code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--ink); background: #EDF0F2; padding: 1px 5px; border-radius: 3px; }
+
+#loading { padding: 40px; text-align: center; color: var(--muted); }
+footer { margin-top: 32px; color: var(--muted); font-size: 13px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: space-between; }
+
+@media (max-width: 960px) {
+  .kpis { grid-template-columns: repeat(3, 1fr); }
+  .kpi:nth-child(4) { border-left: 0; }
+  .kpi:nth-child(n+4) { border-top: 1px solid var(--line); }
+  .grid, .grid.even { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .page { padding: 20px 14px 48px; }
+  header.top h1 { font-size: 26px; }
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .kpi:nth-child(n) { border-left: 0; border-top: 1px solid var(--line); }
+  .kpi:nth-child(-n+2) { border-top: 0; }
+  .kpi:nth-child(even) { border-left: 1px solid var(--line); }
+  .kpi .value { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div>
+      <h1>Auto Transport Sales Dashboard</h1>
+      <p>Twelve months of vehicle shipping quotes across the US. Every number on this page comes from a SQL query that runs in your browser. Press SQL on any panel to see it, or write your own at the bottom.</p>
+    </div>
+    <a class="repo" href="https://github.com/teodor-ninkov/sales-dashboard">View source on GitHub</a>
+  </header>
+
+  <div id="loading">Loading data and SQL engine...</div>
+
+  <div id="app" hidden>
+    <section class="filters" aria-label="Filters">
+      <div class="filter">
+        <span>Period</span>
+        <div class="seg" id="period" role="group" aria-label="Period">
+          <button type="button" data-value="" aria-pressed="true">All</button>
+          <button type="button" data-value="Q4 2025" aria-pressed="false">Q4 2025</button>
+          <button type="button" data-value="Q1 2026" aria-pressed="false">Q1 2026</button>
+          <button type="button" data-value="Q2 2026" aria-pressed="false">Q2 2026</button>
+          <button type="button" data-value="Q3 2026" aria-pressed="false">Q3 2026</button>
+        </div>
+      </div>
+      <div class="filter">
+        <label for="agent">Agent</label>
+        <select id="agent"><option value="">All agents</option></select>
+      </div>
+      <div class="filter">
+        <label for="source">Lead source</label>
+        <select id="source"><option value="">All sources</option></select>
+      </div>
+    </section>
+
+    <section class="kpis" aria-label="Key figures">
+      <div class="kpi"><div class="label">Revenue won</div><div class="value" id="k-revenue">0</div><div class="sub" id="k-revenue-sub"></div></div>
+      <div class="kpi"><div class="label">Quotes</div><div class="value" id="k-quotes">0</div><div class="sub">requests received</div></div>
+      <div class="kpi"><div class="label">Orders won</div><div class="value" id="k-won">0</div><div class="sub">booked, in transit or delivered</div></div>
+      <div class="kpi"><div class="label">Conversion</div><div class="value" id="k-conv">0%</div><div class="sub">won / quotes</div></div>
+      <div class="kpi"><div class="label">Average order</div><div class="value" id="k-avg">0</div><div class="sub">per won order</div></div>
+      <div class="kpi"><div class="label">Customer rating</div><div class="value" id="k-rating">0</div><div class="sub">out of 5, delivered orders</div></div>
+    </section>
+
+    <div class="grid">
+      <div class="panel">
+        <div class="panel-head"><div><h2>Revenue by month</h2><p>Won orders only</p></div><button class="sql-toggle" type="button" aria-expanded="false" data-sql="monthly">SQL</button></div>
+        <div class="panel-body"><div class="chart-wrap"><canvas id="c-monthly"></canvas></div></div>
+        <pre class="sql" id="sql-monthly"></pre>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><h2>Conversion by lead source</h2><p>Share of quotes that became orders</p></div><button class="sql-toggle" type="button" aria-expanded="false" data-sql="sources">SQL</button></div>
+        <div class="panel-body"><div class="chart-wrap"><canvas id="c-sources"></canvas></div></div>
+        <pre class="sql" id="sql-sources"></pre>
+      </div>
+    </div>
+
+    <div class="grid even">
+      <div class="panel">
+        <div class="panel-head"><div><h2>Top routes by revenue</h2><p>Origin to destination state</p></div><button class="sql-toggle" type="button" aria-expanded="false" data-sql="routes">SQL</button></div>
+        <div class="panel-body"><div class="chart-wrap tall"><canvas id="c-routes"></canvas></div></div>
+        <pre class="sql" id="sql-routes"></pre>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><h2>Price per mile by distance</h2><p>Longer routes are cheaper per mile</p></div><button class="sql-toggle" type="button" aria-expanded="false" data-sql="bands">SQL</button></div>
+        <div class="panel-body"><div class="chart-wrap tall"><canvas id="c-bands"></canvas></div></div>
+        <pre class="sql" id="sql-bands"></pre>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <div class="panel-head"><div><h2>Agent leaderboard</h2><p>Ranked by revenue won</p></div><button class="sql-toggle" type="button" aria-expanded="false" data-sql="agents">SQL</button></div>
+        <div class="panel-body table-wrap" id="agents-table"></div>
+        <pre class="sql" id="sql-agents"></pre>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><h2>Revenue by vehicle type</h2><p>Won orders only</p></div><button class="sql-toggle" type="button" aria-expanded="false" data-sql="vehicles">SQL</button></div>
+        <div class="panel-body"><div class="chart-wrap"><canvas id="c-vehicles"></canvas></div></div>
+        <pre class="sql" id="sql-vehicles"></pre>
+      </div>
+    </div>
+
+    <div class="panel explorer">
+      <div class="panel-head"><div><h2>SQL explorer</h2><p>Query the same data yourself. SQLite syntax, runs locally, nothing is sent anywhere.</p></div></div>
+      <div class="panel-body">
+        <p class="schema">Table <code>orders</code>: <code>order_id</code>, <code>order_date</code>, <code>agent</code>, <code>lead_source</code>, <code>origin_state</code>, <code>destination_state</code>, <code>distance_miles</code>, <code>vehicle_type</code>, <code>transport_type</code>, <code>quote_price</code>, <code>status</code>, <code>days_to_pickup</code>, <code>customer_rating</code></p>
+        <textarea id="query" spellcheck="false"></textarea>
+        <div class="examples" id="examples"></div>
+        <div class="row">
+          <button class="run" type="button" id="run">Run query</button>
+          <span class="hint">Ctrl+Enter also runs it. Results are limited to 200 rows.</span>
+        </div>
+        <div class="error" id="query-error" hidden></div>
+        <div class="result table-wrap" id="query-result"></div>
+      </div>
+    </div>
+
+    <footer>
+      <span>Sample dataset generated for this project. Data: data/orders.csv. Queries: sql/queries.sql.</span>
+      <span>Built with sql.js and Chart.js by Teodor Ninkov</span>
+    </footer>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const WON = "status IN ('Booked', 'In transit', 'Delivered')";
+const PERIODS = {
+  "Q4 2025": ["2025-10-01", "2025-12-31"],
+  "Q1 2026": ["2026-01-01", "2026-03-31"],
+  "Q2 2026": ["2026-04-01", "2026-06-30"],
+  "Q3 2026": ["2026-07-01", "2026-09-30"]
+};
+const COLORS = ["#1E3A5F", "#D98E04", "#1F7A5A", "#8A9BA8", "#B3362E", "#5C6B73"];
+const state = { period: "", agent: "", source: "" };
+const charts = {};
+let db;
+
+const QUERIES = {
+  kpis: `SELECT
+  COUNT(*) AS quotes,
+  SUM(CASE WHEN ${WON} THEN 1 ELSE 0 END) AS won,
+  SUM(CASE WHEN ${WON} THEN quote_price ELSE 0 END) AS revenue,
+  ROUND(100.0 * SUM(CASE WHEN ${WON} THEN 1 ELSE 0 END) / COUNT(*), 1) AS conversion_pct,
+  ROUND(AVG(CASE WHEN ${WON} THEN quote_price END)) AS avg_order,
+  ROUND(AVG(customer_rating), 2) AS avg_rating
+FROM orders
+{where}`,
+  monthly: `SELECT
+  strftime('%Y-%m', order_date) AS month,
+  SUM(CASE WHEN ${WON} THEN quote_price ELSE 0 END) AS revenue,
+  SUM(CASE WHEN ${WON} THEN 1 ELSE 0 END) AS won
+FROM orders
+{where}
+GROUP BY month
+ORDER BY month`,
+  sources: `SELECT
+  lead_source,
+  COUNT(*) AS quotes,
+  ROUND(100.0 * SUM(CASE WHEN ${WON} THEN 1 ELSE 0 END) / COUNT(*), 1) AS conversion_pct
+FROM orders
+{where}
+GROUP BY lead_source
+ORDER BY conversion_pct DESC`,
+  routes: `SELECT
+  origin_state || ' to ' || destination_state AS route,
+  COUNT(*) AS won,
+  SUM(quote_price) AS revenue
+FROM orders
+{where} AND ${WON}
+GROUP BY route
+ORDER BY revenue DESC
+LIMIT 8`,
+  vehicles: `SELECT
+  vehicle_type,
+  SUM(quote_price) AS revenue
+FROM orders
+{where} AND ${WON}
+GROUP BY vehicle_type
+ORDER BY revenue DESC`,
+  bands: `SELECT
+  CASE
+    WHEN distance_miles < 500 THEN 'Under 500 mi'
+    WHEN distance_miles < 1000 THEN '500 to 999 mi'
+    WHEN distance_miles < 1500 THEN '1,000 to 1,499 mi'
+    WHEN distance_miles < 2000 THEN '1,500 to 1,999 mi'
+    ELSE '2,000+ mi'
+  END AS band,
+  MIN(distance_miles) AS sort_key,
+  COUNT(*) AS won,
+  ROUND(AVG(quote_price * 1.0 / distance_miles), 2) AS price_per_mile
+FROM orders
+{where} AND ${WON}
+GROUP BY band
+ORDER BY sort_key`,
+  agents: `SELECT
+  agent,
+  COUNT(*) AS quotes,
+  SUM(CASE WHEN ${WON} THEN 1 ELSE 0 END) AS won,
+  ROUND(100.0 * SUM(CASE WHEN ${WON} THEN 1 ELSE 0 END) / COUNT(*), 1) AS conversion_pct,
+  SUM(CASE WHEN ${WON} THEN quote_price ELSE 0 END) AS revenue,
+  ROUND(AVG(customer_rating), 2) AS avg_rating
+FROM orders
+{where}
+GROUP BY agent
+ORDER BY revenue DESC`
+};
+
+const EXAMPLES = [
+  ["Lost quotes by source", `SELECT lead_source, COUNT(*) AS lost\nFROM orders\nWHERE status = 'Lost'\nGROUP BY lead_source\nORDER BY lost DESC`],
+  ["Enclosed vs open", `SELECT transport_type,\n  COUNT(*) AS won,\n  ROUND(AVG(quote_price)) AS avg_price\nFROM orders\nWHERE ${WON}\nGROUP BY transport_type`],
+  ["Best month per agent", `SELECT agent, month, revenue FROM (\n  SELECT agent, strftime('%Y-%m', order_date) AS month,\n    SUM(quote_price) AS revenue,\n    ROW_NUMBER() OVER (PARTITION BY agent ORDER BY SUM(quote_price) DESC) AS rn\n  FROM orders\n  WHERE ${WON}\n  GROUP BY agent, month\n)\nWHERE rn = 1\nORDER BY revenue DESC`],
+  ["Urgent pickups", `SELECT days_to_pickup,\n  COUNT(*) AS quotes,\n  ROUND(100.0 * SUM(CASE WHEN ${WON} THEN 1 ELSE 0 END) / COUNT(*), 1) AS conversion_pct\nFROM orders\nGROUP BY days_to_pickup\nORDER BY days_to_pickup`]
+];
+
+const fmtMoney = n => "$" + Math.round(n).toLocaleString("en-US");
+const fmtNum = n => Number(n).toLocaleString("en-US");
+
+function whereClause() {
+  const parts = [];
+  if (state.period) {
+    const [from, to] = PERIODS[state.period];
+    parts.push(`order_date BETWEEN '${from}' AND '${to}'`);
+  }
+  if (state.agent) parts.push(`agent = '${state.agent.replace(/'/g, "''")}'`);
+  if (state.source) parts.push(`lead_source = '${state.source.replace(/'/g, "''")}'`);
+  return "WHERE " + (parts.length ? parts.join(" AND ") : "1 = 1");
+}
+
+function sql(name) {
+  return QUERIES[name].replace("{where}", whereClause());
+}
+
+function rows(query) {
+  const res = db.exec(query);
+  if (!res.length) return { columns: [], values: [] };
+  return res[0];
+}
+
+function objects(query) {
+  const { columns, values } = rows(query);
+  return values.map(v => Object.fromEntries(columns.map((c, i) => [c, v[i]])));
+}
+
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const header = lines.shift().split(",");
+  return lines.map(line => {
+    const cells = line.split(",");
+    return header.map((h, i) => cells[i] ?? "");
+  });
+}
+
+async function loadData() {
+  const [SQL, csv] = await Promise.all([
+    initSqlJs({ locateFile: f => "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/" + f }),
+    fetch("data/orders.csv").then(r => r.text())
+  ]);
+  db = new SQL.Database();
+  db.run(`CREATE TABLE orders (
+    order_id INTEGER PRIMARY KEY,
+    order_date TEXT,
+    agent TEXT,
+    lead_source TEXT,
+    origin_state TEXT,
+    destination_state TEXT,
+    distance_miles INTEGER,
+    vehicle_type TEXT,
+    transport_type TEXT,
+    quote_price REAL,
+    status TEXT,
+    days_to_pickup INTEGER,
+    customer_rating REAL
+  )`);
+  const stmt = db.prepare("INSERT INTO orders VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+  db.run("BEGIN");
+  for (const r of parseCsv(csv)) {
+    stmt.run([+r[0], r[1], r[2], r[3], r[4], r[5], +r[6], r[7], r[8], +r[9], r[10], +r[11], r[12] === "" ? null : +r[12]]);
+  }
+  db.run("COMMIT");
+  stmt.free();
+}
+
+function fillSelect(id, query) {
+  const el = document.getElementById(id);
+  for (const r of objects(query)) {
+    const opt = document.createElement("option");
+    opt.value = r.v;
+    opt.textContent = r.v;
+    el.appendChild(opt);
+  }
+}
+
+function baseOptions(extra) {
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return Object.assign({
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: reduced ? false : { duration: 400 },
+    plugins: { legend: { display: false } }
+  }, extra);
+}
+
+function upsert(id, config) {
+  if (charts[id]) {
+    charts[id].data = config.data;
+    charts[id].update();
+    return;
+  }
+  charts[id] = new Chart(document.getElementById(id), config);
+}
+
+function renderKpis() {
+  const k = objects(sql("kpis"))[0];
+  document.getElementById("k-revenue").textContent = fmtMoney(k.revenue || 0);
+  document.getElementById("k-revenue-sub").textContent = state.period ? state.period : "Oct 2025 to Sep 2026";
+  document.getElementById("k-quotes").textContent = fmtNum(k.quotes || 0);
+  document.getElementById("k-won").textContent = fmtNum(k.won || 0);
+  document.getElementById("k-conv").textContent = (k.conversion_pct || 0) + "%";
+  document.getElementById("k-avg").textContent = fmtMoney(k.avg_order || 0);
+  document.getElementById("k-rating").textContent = k.avg_rating == null ? "n/a" : k.avg_rating.toFixed(2);
+}
+
+function renderMonthly() {
+  const data = objects(sql("monthly"));
+  upsert("c-monthly", {
+    type: "bar",
+    data: {
+      labels: data.map(r => r.month),
+      datasets: [
+        { type: "line", label: "Won orders", data: data.map(r => r.won), borderColor: "#D98E04", backgroundColor: "#D98E04", yAxisID: "y1", tension: 0.3, pointRadius: 3 },
+        { label: "Revenue", data: data.map(r => r.revenue), backgroundColor: "#1E3A5F", borderRadius: 3 }
+      ]
+    },
+    options: baseOptions({
+      plugins: { legend: { display: true, position: "bottom" }, tooltip: { callbacks: { label: c => c.dataset.label + ": " + (c.dataset.yAxisID === "y1" ? c.raw : fmtMoney(c.raw)) } } },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => "$" + (v / 1000) + "k" }, grid: { color: "#EDF0F2" } },
+        y1: { beginAtZero: true, position: "right", grid: { drawOnChartArea: false } },
+        x: { grid: { display: false } }
+      }
+    })
+  });
+}
+
+function renderSources() {
+  const data = objects(sql("sources"));
+  upsert("c-sources", {
+    type: "bar",
+    data: { labels: data.map(r => r.lead_source), datasets: [{ data: data.map(r => r.conversion_pct), backgroundColor: data.map((r, i) => i === 0 ? "#1F7A5A" : "#1E3A5F"), borderRadius: 3 }] },
+    options: baseOptions({
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw + "% of " + data[c.dataIndex].quotes + " quotes" } } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => v + "%" }, grid: { color: "#EDF0F2" } }, x: { grid: { display: false } } }
+    })
+  });
+}
+
+function renderRoutes() {
+  const data = objects(sql("routes"));
+  upsert("c-routes", {
+    type: "bar",
+    data: { labels: data.map(r => r.route), datasets: [{ data: data.map(r => r.revenue), backgroundColor: "#1E3A5F", borderRadius: 3 }] },
+    options: baseOptions({
+      indexAxis: "y",
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmtMoney(c.raw) + " from " + data[c.dataIndex].won + " orders" } } },
+      scales: { x: { beginAtZero: true, ticks: { callback: v => "$" + (v / 1000) + "k" }, grid: { color: "#EDF0F2" } }, y: { grid: { display: false } } }
+    })
+  });
+}
+
+function renderBands() {
+  const data = objects(sql("bands"));
+  upsert("c-bands", {
+    type: "bar",
+    data: { labels: data.map(r => r.band), datasets: [{ data: data.map(r => r.price_per_mile), backgroundColor: "#D98E04", borderRadius: 3 }] },
+    options: baseOptions({
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => "$" + c.raw.toFixed(2) + " per mile, " + data[c.dataIndex].won + " orders" } } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => "$" + v.toFixed(2) }, grid: { color: "#EDF0F2" } }, x: { grid: { display: false } } }
+    })
+  });
+}
+
+function renderVehicles() {
+  const data = objects(sql("vehicles"));
+  upsert("c-vehicles", {
+    type: "doughnut",
+    data: { labels: data.map(r => r.vehicle_type), datasets: [{ data: data.map(r => r.revenue), backgroundColor: COLORS, borderWidth: 2, borderColor: "#FFFFFF" }] },
+    options: baseOptions({
+      cutout: "62%",
+      plugins: { legend: { display: true, position: "right" }, tooltip: { callbacks: { label: c => c.label + ": " + fmtMoney(c.raw) } } }
+    })
+  });
+}
+
+function renderAgents() {
+  const data = objects(sql("agents"));
+  const max = Math.max(...data.map(r => r.revenue), 1);
+  const html = `<table>
+    <thead><tr><th>Agent</th><th class="num">Quotes</th><th class="num">Won</th><th class="num">Conversion</th><th>Revenue</th><th class="num">Rating</th></tr></thead>
+    <tbody>${data.map(r => `<tr>
+      <td>${r.agent}</td>
+      <td class="num">${fmtNum(r.quotes)}</td>
+      <td class="num">${fmtNum(r.won)}</td>
+      <td class="num">${r.conversion_pct}%</td>
+      <td><span class="bar" style="width:${Math.round(120 * r.revenue / max)}px"></span>${fmtMoney(r.revenue)}</td>
+      <td class="num">${r.avg_rating == null ? "n/a" : r.avg_rating.toFixed(2)}</td>
+    </tr>`).join("")}</tbody></table>`;
+  document.getElementById("agents-table").innerHTML = html;
+}
+
+function renderSqlBlocks() {
+  for (const name of ["monthly", "sources", "routes", "bands", "agents", "vehicles"]) {
+    document.getElementById("sql-" + name).textContent = sql(name);
+  }
+}
+
+function renderAll() {
+  renderKpis();
+  renderMonthly();
+  renderSources();
+  renderRoutes();
+  renderBands();
+  renderVehicles();
+  renderAgents();
+  renderSqlBlocks();
+}
+
+function resultTable(res) {
+  if (!res.columns.length) return "<p class=\"hint\">The query returned no rows.</p>";
+  const head = res.columns.map(c => `<th>${c}</th>`).join("");
+  const body = res.values.slice(0, 200).map(v => `<tr>${v.map(x => `<td>${x == null ? "" : x}</td>`).join("")}</tr>`).join("");
+  const note = res.values.length > 200 ? `<p class="hint">Showing 200 of ${res.values.length} rows.</p>` : `<p class="hint">${res.values.length} rows</p>`;
+  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>${note}`;
+}
+
+function runQuery() {
+  const box = document.getElementById("query");
+  const err = document.getElementById("query-error");
+  const out = document.getElementById("query-result");
+  err.hidden = true;
+  try {
+    const res = rows(box.value);
+    out.innerHTML = resultTable(res);
+  } catch (e) {
+    out.innerHTML = "";
+    err.textContent = "SQL error: " + e.message;
+    err.hidden = false;
+  }
+}
+
+function bind() {
+  document.querySelectorAll("#period button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#period button").forEach(b => b.setAttribute("aria-pressed", "false"));
+      btn.setAttribute("aria-pressed", "true");
+      state.period = btn.dataset.value;
+      renderAll();
+    });
+  });
+  document.getElementById("agent").addEventListener("change", e => { state.agent = e.target.value; renderAll(); });
+  document.getElementById("source").addEventListener("change", e => { state.source = e.target.value; renderAll(); });
+  document.querySelectorAll(".sql-toggle").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const open = btn.getAttribute("aria-expanded") !== "true";
+      btn.setAttribute("aria-expanded", String(open));
+      document.getElementById("sql-" + btn.dataset.sql).classList.toggle("open", open);
+    });
+  });
+  const box = document.getElementById("query");
+  box.value = sql("agents");
+  document.getElementById("run").addEventListener("click", runQuery);
+  box.addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) runQuery(); });
+  const ex = document.getElementById("examples");
+  for (const [label, q] of EXAMPLES) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    b.addEventListener("click", () => { box.value = q; runQuery(); });
+    ex.appendChild(b);
+  }
+}
+
+async function main() {
+  try {
+    await loadData();
+    Chart.defaults.font.family = "Archivo, Helvetica Neue, Arial, sans-serif";
+    Chart.defaults.color = "#5C6B73";
+    fillSelect("agent", "SELECT DISTINCT agent AS v FROM orders ORDER BY agent");
+    fillSelect("source", "SELECT DISTINCT lead_source AS v FROM orders ORDER BY lead_source");
+    bind();
+    document.getElementById("loading").hidden = true;
+    document.getElementById("app").hidden = false;
+    renderAll();
+    runQuery();
+  } catch (e) {
+    document.getElementById("loading").textContent = "Could not load the dashboard: " + e.message;
+  }
+}
+
+main();
+</script>
+</body>
+</html>
