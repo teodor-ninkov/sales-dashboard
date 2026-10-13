@@ -4,7 +4,7 @@ Interactive sales dashboard where every chart is driven by a real SQL query, exe
 
 The data is 736 vehicle shipping quote requests over 12 months (Oct 2025 to Sep 2026): agents, lead sources, routes, vehicle types, prices and outcomes. The dataset is generated to look like a real US auto transport brokerage.
 
-**Live demo:** (https://teodor-ninkov.github.io/sales-dashboard/)]
+**Live demo:** (https://teodor-ninkov.github.io/sales-dashboard/)
 
 ![Screenshot](screenshot.png)
 
