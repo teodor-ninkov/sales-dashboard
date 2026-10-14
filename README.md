@@ -1,55 +1,31 @@
-# Auto Transport Sales Dashboard
+# Sales Dashboard
 
-Interactive sales dashboard where every chart is driven by a real SQL query, executed directly in the browser.
+A year of vehicle shipping quotes (Oct 2025 to Sep 2026), shown the way I would have wanted to see them when I was selling: revenue by month, which lead sources actually convert, which routes pay, how price per mile drops on long routes, and how each agent is doing.
 
-The data is 736 vehicle shipping quote requests over 12 months (Oct 2025 to Sep 2026): agents, lead sources, routes, vehicle types, prices and outcomes. The dataset is generated to look like a real US auto transport brokerage.
+Every number on the page comes from a SQL query that runs in the browser. Press **SQL** on any panel to see it, or write your own in the explorer at the bottom.
 
-**Live demo:** (https://teodor-ninkov.github.io/sales-dashboard/)
+**Demo:** https://teodor-ninkov.github.io/sales-dashboard/
 
 ![Screenshot](screenshot.png)
 
-## What it shows
-
-- Revenue, quotes, won orders, conversion rate, average order and customer rating, with filters by period, agent and lead source
-- Revenue and won orders by month
-- Conversion rate by lead source
-- Top routes by revenue
-- Price per mile by distance band
-- Agent leaderboard
-- Revenue by vehicle type
-
-Press **SQL** on any panel to see the exact query behind it. The SQL explorer at the bottom lets you run your own queries against the same table.
-
 ## How it works
 
-1. `data/orders.csv` is loaded with `fetch` and inserted into an in-memory SQLite database created by [sql.js](https://github.com/sql-js/sql.js) (SQLite compiled to WebAssembly).
-2. Filters are turned into a `WHERE` clause that is injected into each query in `sql/queries.sql`.
-3. Query results are rendered with [Chart.js](https://www.chartjs.org/) and plain HTML tables.
+- `data/orders.csv` (736 quotes) and `data/agents.csv` (teams and monthly targets) are loaded into an in-memory SQLite database with [sql.js](https://github.com/sql-js/sql.js).
+- The filters (period, agent, lead source) become a `WHERE` clause that is added to every query.
+- Charts are drawn with Chart.js. All queries are also in `sql/queries.sql`.
 
-No backend, no build step: a single `index.html`, a CSV and the SQL file.
+The data is generated, but shaped on what I saw in real auto transport sales: referrals and phone leads convert far better than marketplace leads, and long routes are cheaper per mile.
 
-## Tech stack
+## Problems I hit
 
-- SQL (SQLite dialect): aggregations, `CASE`, `GROUP BY`, string functions, window functions in the examples
-- JavaScript, HTML, CSS
-- sql.js, Chart.js
+- **No backend on GitHub Pages.** I wanted real SQL, not JavaScript pretending to be SQL. sql.js runs SQLite as WebAssembly, so the whole database lives in the page.
+- **Wrong folders after uploading through the browser.** The page loads `data/orders.csv`, and uploading files one by one flattened the folders and broke it. Keeping the paths fixed was the fix.
+- **One table was not enough to practise joins.** I added `agents.csv` with teams and targets, so the explorer has JOIN and CTE examples (revenue by team, months each agent hit target).
 
 ## Run locally
 
-The page fetches the CSV, so it needs to be served over HTTP (opening the file directly will not work):
-
 ```bash
-git clone https://github.com/teodor-ninkov/sales-dashboard.git
-cd sales-dashboard
 python -m http.server 8000
 ```
 
-Open http://localhost:8000.
-
-## Project structure
-
-```
-index.html          Dashboard: layout, queries, charts, SQL explorer
-data/orders.csv     Sample dataset (736 rows)
-sql/queries.sql     The queries used by the dashboard
-```
+Then open http://localhost:8000. Opening the file directly will not work, because the page fetches the CSV files.
