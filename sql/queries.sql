@@ -81,3 +81,31 @@ FROM orders
 {where}
 GROUP BY agent
 ORDER BY revenue DESC;
+
+-- Explorer examples that use the agents table
+
+-- Revenue by team
+SELECT a.team,
+  COUNT(o.order_id) AS won,
+  SUM(o.quote_price) AS revenue
+FROM orders o
+JOIN agents a ON a.agent = o.agent
+WHERE o.status IN ('Booked', 'In transit', 'Delivered')
+GROUP BY a.team
+ORDER BY revenue DESC;
+
+-- How many months each agent hit their target
+WITH monthly AS (
+  SELECT agent, strftime('%Y-%m', order_date) AS month,
+    SUM(quote_price) AS revenue
+  FROM orders
+  WHERE status IN ('Booked', 'In transit', 'Delivered')
+  GROUP BY agent, month
+)
+SELECT m.agent, a.monthly_target,
+  ROUND(AVG(m.revenue)) AS avg_month,
+  SUM(CASE WHEN m.revenue >= a.monthly_target THEN 1 ELSE 0 END) AS months_on_target
+FROM monthly m
+JOIN agents a ON a.agent = m.agent
+GROUP BY m.agent
+ORDER BY months_on_target DESC;
