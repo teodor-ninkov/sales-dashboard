@@ -205,7 +205,7 @@ footer { margin-top: 32px; color: var(--muted); font-size: 13px; display: flex; 
     <div class="panel explorer">
       <div class="panel-head"><div><h2>SQL explorer</h2><p>Query the same data yourself. SQLite syntax, runs locally, nothing is sent anywhere.</p></div></div>
       <div class="panel-body">
-        <p class="schema">Table <code>orders</code>: <code>order_id</code>, <code>order_date</code>, <code>agent</code>, <code>lead_source</code>, <code>origin_state</code>, <code>destination_state</code>, <code>distance_miles</code>, <code>vehicle_type</code>, <code>transport_type</code>, <code>quote_price</code>, <code>status</code>, <code>days_to_pickup</code>, <code>customer_rating</code></p>
+        <p class="schema">Table <code>orders</code>: <code>order_id</code>, <code>order_date</code>, <code>agent</code>, <code>lead_source</code>, <code>origin_state</code>, <code>destination_state</code>, <code>distance_miles</code>, <code>vehicle_type</code>, <code>transport_type</code>, <code>quote_price</code>, <code>status</code>, <code>days_to_pickup</code>, <code>customer_rating</code>. Table <code>agents</code>: <code>agent</code>, <code>team</code>, <code>start_date</code>, <code>monthly_target</code></p>
         <textarea id="query" spellcheck="false"></textarea>
         <div class="examples" id="examples"></div>
         <div class="row">
@@ -310,6 +310,8 @@ ORDER BY revenue DESC`
 };
 
 const EXAMPLES = [
+  ["Revenue by team (JOIN)", `SELECT a.team,\n  COUNT(o.order_id) AS won,\n  SUM(o.quote_price) AS revenue\nFROM orders o\nJOIN agents a ON a.agent = o.agent\nWHERE o.${WON}\nGROUP BY a.team\nORDER BY revenue DESC`],
+  ["Target hit rate (CTE)", `WITH monthly AS (\n  SELECT agent, strftime('%Y-%m', order_date) AS month,\n    SUM(quote_price) AS revenue\n  FROM orders\n  WHERE ${WON}\n  GROUP BY agent, month\n)\nSELECT m.agent, a.monthly_target,\n  ROUND(AVG(m.revenue)) AS avg_month,\n  SUM(CASE WHEN m.revenue >= a.monthly_target THEN 1 ELSE 0 END) AS months_on_target\nFROM monthly m\nJOIN agents a ON a.agent = m.agent\nGROUP BY m.agent\nORDER BY months_on_target DESC`],
   ["Lost quotes by source", `SELECT lead_source, COUNT(*) AS lost\nFROM orders\nWHERE status = 'Lost'\nGROUP BY lead_source\nORDER BY lost DESC`],
   ["Enclosed vs open", `SELECT transport_type,\n  COUNT(*) AS won,\n  ROUND(AVG(quote_price)) AS avg_price\nFROM orders\nWHERE ${WON}\nGROUP BY transport_type`],
   ["Best month per agent", `SELECT agent, month, revenue FROM (\n  SELECT agent, strftime('%Y-%m', order_date) AS month,\n    SUM(quote_price) AS revenue,\n    ROW_NUMBER() OVER (PARTITION BY agent ORDER BY SUM(quote_price) DESC) AS rn\n  FROM orders\n  WHERE ${WON}\n  GROUP BY agent, month\n)\nWHERE rn = 1\nORDER BY revenue DESC`],
@@ -355,9 +357,10 @@ function parseCsv(text) {
 }
 
 async function loadData() {
-  const [SQL, csv] = await Promise.all([
+  const [SQL, csv, agentsCsv] = await Promise.all([
     initSqlJs({ locateFile: f => "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/" + f }),
-    fetch("data/orders.csv").then(r => r.text())
+    fetch("data/orders.csv").then(r => r.text()),
+    fetch("data/agents.csv").then(r => r.text())
   ]);
   db = new SQL.Database();
   db.run(`CREATE TABLE orders (
@@ -382,6 +385,15 @@ async function loadData() {
   }
   db.run("COMMIT");
   stmt.free();
+  db.run(`CREATE TABLE agents (
+    agent TEXT PRIMARY KEY,
+    team TEXT,
+    start_date TEXT,
+    monthly_target REAL
+  )`);
+  const agentStmt = db.prepare("INSERT INTO agents VALUES (?,?,?,?)");
+  for (const r of parseCsv(agentsCsv)) agentStmt.run([r[0], r[1], r[2], +r[3]]);
+  agentStmt.free();
 }
 
 function fillSelect(id, query) {
