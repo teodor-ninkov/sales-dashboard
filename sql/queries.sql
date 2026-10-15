@@ -109,3 +109,31 @@ FROM monthly m
 JOIN agents a ON a.agent = m.agent
 GROUP BY m.agent
 ORDER BY months_on_target DESC;
+
+-- ABC analysis of routes: A = first 80% of revenue, B = next 15%, C = the rest
+WITH route_revenue AS (
+  SELECT
+    origin_state || ' to ' || destination_state AS route,
+    COUNT(*) AS won,
+    SUM(quote_price) AS revenue
+  FROM orders
+  {where} AND status IN ('Booked', 'In transit', 'Delivered')
+  GROUP BY route
+),
+ranked AS (
+  SELECT
+    route, won, revenue,
+    SUM(revenue) OVER (ORDER BY revenue DESC, route ROWS UNBOUNDED PRECEDING) AS running,
+    SUM(revenue) OVER () AS total
+  FROM route_revenue
+)
+SELECT
+  route, won, revenue,
+  ROUND(100.0 * running / total, 1) AS cumulative_pct,
+  CASE
+    WHEN running - revenue < 0.80 * total THEN 'A'
+    WHEN running - revenue < 0.95 * total THEN 'B'
+    ELSE 'C'
+  END AS class
+FROM ranked
+ORDER BY revenue DESC;
