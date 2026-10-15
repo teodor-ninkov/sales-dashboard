@@ -97,6 +97,18 @@ tbody tr:last-child td { border-bottom: 0; }
 .schema { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
 .schema code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--ink); background: #EDF0F2; padding: 1px 5px; border-radius: 3px; }
 
+.abc-panel { margin-bottom: 20px; }
+.abc-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.abc-box { border: 1px solid var(--line); border-left-width: 4px; border-radius: var(--radius); padding: 12px 14px; display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center; }
+.abc-letter { grid-row: span 2; font-size: 28px; font-weight: 700; line-height: 1; }
+.abc-main { font-weight: 600; }
+.abc-sub { color: var(--muted); font-size: 13px; }
+.abc-box.abc-a { border-left-color: var(--green); } .abc-box.abc-a .abc-letter { color: var(--green); }
+.abc-box.abc-b { border-left-color: var(--amber); } .abc-box.abc-b .abc-letter { color: var(--amber); }
+.abc-box.abc-c { border-left-color: var(--slate); } .abc-box.abc-c .abc-letter { color: var(--slate); }
+.abc-tag { display: inline-block; width: 22px; text-align: center; border-radius: 4px; color: #fff; font-weight: 700; font-size: 12px; padding: 2px 0; }
+.abc-tag.abc-a { background: var(--green); } .abc-tag.abc-b { background: var(--amber); } .abc-tag.abc-c { background: var(--slate); }
+@media (max-width: 640px) { .abc-summary { grid-template-columns: 1fr; } }
 #loading { padding: 40px; text-align: center; color: var(--muted); }
 footer { margin-top: 32px; color: var(--muted); font-size: 13px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: space-between; }
 
@@ -202,6 +214,15 @@ footer { margin-top: 32px; color: var(--muted); font-size: 13px; display: flex; 
       </div>
     </div>
 
+    <div class="panel abc-panel">
+      <div class="panel-head"><div><h2>ABC analysis of routes</h2><p>A routes bring the first 80% of revenue, B the next 15%, C the rest</p></div><button class="sql-toggle" type="button" aria-expanded="false" data-sql="abc">SQL</button></div>
+      <div class="panel-body">
+        <div class="abc-summary" id="abc-summary"></div>
+        <div class="table-wrap" id="abc-table"></div>
+      </div>
+      <pre class="sql" id="sql-abc"></pre>
+    </div>
+
     <div class="panel explorer">
       <div class="panel-head"><div><h2>SQL explorer</h2><p>Query the same data yourself. SQLite syntax, runs locally, nothing is sent anywhere.</p></div></div>
       <div class="panel-body">
@@ -296,6 +317,32 @@ FROM orders
 {where} AND ${WON}
 GROUP BY band
 ORDER BY sort_key`,
+  abc: `WITH route_revenue AS (
+  SELECT
+    origin_state || ' to ' || destination_state AS route,
+    COUNT(*) AS won,
+    SUM(quote_price) AS revenue
+  FROM orders
+  {where} AND ${WON}
+  GROUP BY route
+),
+ranked AS (
+  SELECT
+    route, won, revenue,
+    SUM(revenue) OVER (ORDER BY revenue DESC, route ROWS UNBOUNDED PRECEDING) AS running,
+    SUM(revenue) OVER () AS total
+  FROM route_revenue
+)
+SELECT
+  route, won, revenue,
+  ROUND(100.0 * running / total, 1) AS cumulative_pct,
+  CASE
+    WHEN running - revenue < 0.80 * total THEN 'A'
+    WHEN running - revenue < 0.95 * total THEN 'B'
+    ELSE 'C'
+  END AS class
+FROM ranked
+ORDER BY revenue DESC`,
   agents: `SELECT
   agent,
   COUNT(*) AS quotes,
@@ -523,8 +570,32 @@ function renderAgents() {
   document.getElementById("agents-table").innerHTML = html;
 }
 
+function renderAbc() {
+  const data = objects(sql("abc"));
+  const groups = { A: { routes: 0, revenue: 0 }, B: { routes: 0, revenue: 0 }, C: { routes: 0, revenue: 0 } };
+  for (const r of data) { groups[r.class].routes++; groups[r.class].revenue += r.revenue; }
+  const total = data.reduce((s, r) => s + r.revenue, 0) || 1;
+  document.getElementById("abc-summary").innerHTML = ["A", "B", "C"].map(c => `
+    <div class="abc-box abc-${c.toLowerCase()}">
+      <span class="abc-letter">${c}</span>
+      <span class="abc-main">${groups[c].routes} routes</span>
+      <span class="abc-sub">${Math.round(100 * groups[c].revenue / total)}% of revenue, ${data.length ? Math.round(100 * groups[c].routes / data.length) : 0}% of routes</span>
+    </div>`).join("");
+  const rows = data.slice(0, 12).map(r => `<tr>
+    <td><span class="abc-tag abc-${r.class.toLowerCase()}">${r.class}</span></td>
+    <td>${r.route}</td>
+    <td class="num">${fmtNum(r.won)}</td>
+    <td class="num">${fmtMoney(r.revenue)}</td>
+    <td class="num">${r.cumulative_pct}%</td>
+  </tr>`).join("");
+  document.getElementById("abc-table").innerHTML = `<table>
+    <thead><tr><th>Class</th><th>Route</th><th class="num">Won</th><th class="num">Revenue</th><th class="num">Cumulative</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <p class="hint">Top 12 of ${data.length} routes. The full list is one click away in the SQL explorer.</p>`;
+}
+
 function renderSqlBlocks() {
-  for (const name of ["monthly", "sources", "routes", "bands", "agents", "vehicles"]) {
+  for (const name of ["monthly", "sources", "routes", "bands", "agents", "vehicles", "abc"]) {
     document.getElementById("sql-" + name).textContent = sql(name);
   }
 }
@@ -537,6 +608,7 @@ function renderAll() {
   renderBands();
   renderVehicles();
   renderAgents();
+  renderAbc();
   renderSqlBlocks();
 }
 
